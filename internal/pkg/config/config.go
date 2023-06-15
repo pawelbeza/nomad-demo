@@ -13,20 +13,23 @@ type Configuration struct {
 }
 
 type ServerConfiguration struct {
-	Port     string `env:"PORT" envDefault:"8000"`
+	Port     string `env:"PORT" envDefault:"3000"`
 	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 }
 
 func Setup() {
-	var cfg *Configuration
-	if err := env.Parse(cfg); err != nil {
+	var cfg Configuration
+	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("couldn't parse configuration: %v", err)
 	}
 
-	Config = cfg
+	Config = &cfg
 }
 
 // GetConfig helps you to get configuration data
 func GetConfig() *Configuration {
+	if Config == nil {
+		Setup()
+	}
 	return Config
 }
