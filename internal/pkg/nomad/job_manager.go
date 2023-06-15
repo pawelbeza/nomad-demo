@@ -108,6 +108,10 @@ func (s *NomadJobManager) FindServerAddress(jobID string) (string, error) {
 	}
 
 	network, err := s.GetAllocationNetworkDetails(allocation)
+	if err != nil {
+		return "", err
+	}
+
 	return fmt.Sprintf("%v:%v", network.IP, network.DynamicPorts[0].Value), nil
 }
 

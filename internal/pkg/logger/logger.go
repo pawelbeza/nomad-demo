@@ -8,7 +8,11 @@ import (
 
 func Setup(logLevel string) {
 	loggerConf := zap.NewProductionConfig()
-	loggerConf.Level.UnmarshalText([]byte(logLevel))
+	err := loggerConf.Level.UnmarshalText([]byte(logLevel))
+
+	if err != nil {
+		log.Fatalf("invalid logger level %v: %v", logLevel, err)
+	}
 
 	logger, err := loggerConf.Build()
 	if err != nil {
