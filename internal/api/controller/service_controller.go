@@ -41,7 +41,7 @@ func (s *ServiceController) CreateService(c *gin.Context) {
 	}
 
 	serviceName := c.Param("name")
-	url, err := s.Manager.CreateJob(&nomad.JobParams{
+	url, err := s.Manager.CreateJob(c.Request.Context(), &nomad.JobParams{
 		ServiceName: serviceName,
 		Url:         serviceInput.Url,
 		Script:      serviceInput.Script,

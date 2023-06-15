@@ -8,11 +8,11 @@ import (
 )
 
 type JobManager interface {
-	CreateJob(params *JobParams) (string, error)
+	CreateJob(ctx context.Context, params *JobParams) (string, error)
 }
 
 type NomadJobManager struct {
-	cli *api.Client
+	cli *api.Client // ideally I would use interface here but upstream doesn't have any for client
 }
 
 func NewDefaultJobManager() (*NomadJobManager, error) {
@@ -29,34 +29,43 @@ func NewNomadJobManager(cli *api.Client) *NomadJobManager {
 	return &NomadJobManager{cli: cli}
 }
 
-func (s *NomadJobManager) ObserveDeployment(jobID string, jobModifyInd uint64) error {
+func (s *NomadJobManager) ObserveDeploymentEvents(ctx context.Context, eChan <-chan *api.Events) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("observe deployment timeout")
+		case events := <-eChan:
+			for _, event := range events.Events {
+				deployment, err := event.Deployment()
+				if err != nil {
+					return err
+				}
+
+				if deployment.Status == "successful" {
+					return nil
+				} else if deployment.Status == "failed" {
+					return fmt.Errorf("deployment failed: %v", deployment.StatusDescription)
+				}
+			}
+		}
+	}
+}
+
+func (s *NomadJobManager) ObserveDeployment(ctx context.Context, jobID string, jobModifyInd uint64) error {
 	stream := s.cli.EventStream()
-	q := &api.QueryOptions{}
 	topics := map[api.Topic][]string{
 		api.TopicDeployment: {jobID},
 	}
 
-	eChan, err := stream.Stream(context.TODO(), topics, jobModifyInd, q)
+	eventsChan, err := stream.Stream(ctx, topics, jobModifyInd, nil)
 	if err != nil {
 		return err
 	}
 
-	for events := range eChan {
-		for _, event := range events.Events {
-			deployment, err := event.Deployment()
-			if err != nil {
-				return err
-			}
+	ctx, cancel := context.WithTimeout(ctx, TASK_PROGRESS_DEADLINE)
+	defer cancel()
 
-			if deployment.Status == "successful" {
-				return nil
-			} else if deployment.Status == "failed" {
-				return fmt.Errorf("deployment failed: %v", deployment.StatusDescription)
-			}
-		}
-	}
-
-	return fmt.Errorf("events channel was closed")
+	return s.ObserveDeploymentEvents(ctx, eventsChan)
 }
 
 func (s *NomadJobManager) GetAllocationNetworkDetails(allocation *api.Allocation) (*api.NetworkResource, error) {
@@ -102,7 +111,16 @@ func (s *NomadJobManager) FindServerAddress(jobID string) (string, error) {
 	return fmt.Sprintf("%v:%v", network.IP, network.DynamicPorts[0].Value), nil
 }
 
-func (s *NomadJobManager) CreateJob(params *JobParams) (string, error) {
+// It's rather anti-pattern that /service/:name has to wait for deployment of service due
+// to asynchronous nature of Nomad.
+//
+// In real case scenario I think it would be better if
+// /service/:name would only schedule a job and it would be client side responsibility
+// to send another query(ies) to get status with IP and port of the service (similarly as it's done with
+// `nomad deployment status -monitor`)
+//
+// ofc this would be handled by some client side tool which would abstracts away this workflow
+func (s *NomadJobManager) CreateJob(ctx context.Context, params *JobParams) (string, error) {
 	job := NewNginxJob(params)
 
 	jr, _, err := s.cli.Jobs().Register(job, nil)
@@ -110,7 +128,7 @@ func (s *NomadJobManager) CreateJob(params *JobParams) (string, error) {
 		return "", err
 	}
 
-	err = s.ObserveDeployment(*job.ID, jr.JobModifyIndex)
+	err = s.ObserveDeployment(ctx, *job.ID, jr.JobModifyIndex)
 	if err != nil {
 		return "", err
 	}

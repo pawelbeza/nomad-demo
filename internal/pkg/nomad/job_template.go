@@ -16,9 +16,12 @@ func CreateFetcherCmd(url string, script bool) string {
 		return fmt.Sprintf("%v > %v", fetchUrlCmd, outPath)
 	}
 
-	executeCmd := fmt.Sprintf("sh <(%v) 2>&1 > %v", fetchUrlCmd, outPath)
-	return fmt.Sprintf("%v && %v", fetchUrlCmd, executeCmd)
+	return fmt.Sprintf("sh <(%v) 2>&1 > %v", fetchUrlCmd, outPath)
 }
+
+const (
+	TASK_PROGRESS_DEADLINE = 60 * time.Second
+)
 
 type JobParams struct {
 	ServiceName string
@@ -37,7 +40,7 @@ func NewNginxJob(params *JobParams) *api.Job {
 				Name:  util.PointerOf(params.ServiceName),
 				Count: util.PointerOf(1),
 				Update: &api.UpdateStrategy{
-					ProgressDeadline: util.PointerOf(60 * time.Second),
+					ProgressDeadline: util.PointerOf(TASK_PROGRESS_DEADLINE),
 					HealthyDeadline:  util.PointerOf(30 * time.Second),
 				},
 				Tasks: []*api.Task{
