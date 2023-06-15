@@ -20,6 +20,8 @@ Run Golang REST API with an endpoint PUT /services/\<name>, which allows creatin
 
 You set server port through PORT env variable (default is 3000)
 
+*Important Note*: Server responds only after deployment gets completed (it waits for success or failure of the deployment).  Because of that request may take couple of seconds. In real case scenario I would design such API differently as [described in comment](https://github.com/pawelbeza/nomad-demo/blob/master/internal/pkg/nomad/job_manager.go#L118-L126)
+
 ```
 make run
 ```
@@ -36,6 +38,7 @@ content of my webpage"
 "url": "http://192.168.1.104:20676"
 }
 ```
+
 - The content of the pastebin is downloaded and served with Nginx. A request to
 http://192.168.1.104:20676 returns "Hello world, this is the content of my webpage"
 
@@ -46,7 +49,7 @@ Example with script set to true:
 echo "Hello world!"
 ```
 - Create a new service using your API: curl localhost:3000/services/mypage -X PUT -d
-'{"url": "https://pastebin.com/raw/abcde123", "script": true}'
+'{"url": "https://pastebin.com/raw/NYkZSTn1", "script": true}'
 - The API returns:
 ```
 {
