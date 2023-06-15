@@ -7,5 +7,5 @@ clean:
 run:
 	go run cmd/nomad-demo/main.go
 
-test:
-	go test -v ./test/...
+unit_test:
+	go test -race -v ./...
